@@ -16,4 +16,4 @@ app.get("/", function(req,res) {
     res.send("<html><body><h1>App Service Linux Bootcamp - Node.JS</h1><br><b>Host Name: "+ hostname +"</b><br><b>Request received from: </b>" + ip + "<br><b>User Agent: </b>"+ req.headers['user-agent'] +"<br><b>Forwarder IP: </b>"+ ipfw +"</body></html>")
 });
 
-app.listen(envPort);
+app.listen(envPort, '0.0.0.0');
