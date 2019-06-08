@@ -1,7 +1,7 @@
 FROM node:11.15.0-stretch
 
 # Create app directory
-WORKDIR /home/site/wwwroot
+WORKDIR /usr/src/app
 
 COPY startup /opt/startup
 
@@ -34,10 +34,10 @@ EXPOSE 3000 2222
 ENV PORT 3000
 ENV WEBSITE_ROLE_INSTANCE_ID localRoleInstance
 ENV WEBSITE_INSTANCE_ID localInstance
-ENV PATH ${PATH}:/home/site/wwwroot
+ENV PATH ${PATH}:/usr/src/app
 
-ENV APP_HOME "/home/site/wwwroot"
-ENV HTTPD_LOG_DIR "/home/LogFiles"
+ENV APP_HOME "/usr/src/app"
+ENV HTTPD_LOG_DIR "/usr/src/LogFiles"
 
 # CMD [ "npm", "start" ]
 ENTRYPOINT ["/opt/startup/init_container.sh"]
