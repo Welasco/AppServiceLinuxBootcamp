@@ -11,16 +11,28 @@
         "adminUsername": {
             "type": "string"
         },
-        "adminPublicKey": {
+        "adminPassword": {
             "type": "securestring"
-        }      
+        },
+        "authenticationType": {
+            "type": "string",
+            "defaultValue": "sshPublicKey",
+            "allowedValues": [
+              "sshPublicKey",
+              "password"
+            ],
+            "metadata": {
+              "description": "Type of authentication to use on the Virtual Machine. SSH key is recommended."
+            }
+          }               
     },
     "variables": {
         "_location": "[resourceGroup().location]",
         "rsgUniqueStr": "[concat(substring(uniqueString(resourceGroup().id), 0, 4),'-')]",
         "mainName": "AppLab",
         "adminUsername": "[parameters('adminUsername')]",
-        "adminPassword": "[parameters('adminPublicKey')]",
+        "adminPassword": "[parameters('adminPassword')]",
+        "authenticationType": "[parameters('authenticationType')]",
         "addressPrefix": "10.11.0.0/16",
         "subnetName": "DefaultSubnet",
         "subnetPrefix": "10.11.0.0/24",
@@ -45,7 +57,18 @@
         "ServerName": "[concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-VM-')]",
         "ServerPublicIPAddressName": "[concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-VM-PublicIP-')]",
         "ServerNicName": "[concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-VM-NIC-')]",
-        "ServerDNSNameForPublicIP": "[toLower(variables('ServerName'))]"
+        "ServerDNSNameForPublicIP": "[toLower(variables('ServerName'))]",
+        "linuxConfiguration": {
+            "disablePasswordAuthentication": true,
+            "ssh": {
+                "publicKeys": [
+                    {
+                        "path": "[concat('/home/', variables('adminUsername'), '/.ssh/authorized_keys')]",
+                        "keyData": "[variables('adminPassword')]"
+                    }
+                ]
+            }
+        },          
     },
     "resources": [
         {
@@ -521,17 +544,8 @@
                 "osProfile": {
                     "computerName": "[concat(variables('ServerName'),copyIndex(1))]",
                     "adminUsername": "[variables('adminUsername')]",
-                    "linuxConfiguration": {
-                        "disablePasswordAuthentication": true,
-                        "ssh": {
-                            "publicKeys": [
-                                {
-                                    "path": "[concat('/home/', variables('adminUsername'), '/.ssh/authorized_keys')]",
-                                    "keyData": "[variables('adminPassword')]"
-                                }
-                            ]
-                        }
-                    }            
+                    "adminPassword": "[variables('adminPassword')]",
+                    "linuxConfiguration": "[if(equals(variables('authenticationType'), 'password'), json('null'), variables('linuxConfiguration'))]"                       
                 },
                 "storageProfile": {
                     "imageReference": {
@@ -560,6 +574,27 @@
                 }
             }
         },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "name": "[concat(variables('ServerName'),copyIndex(1),'/installcustomscript')]",
+            "apiVersion": "2015-05-01-preview",
+            "location": "[variables('_location')]",
+            "dependsOn": [
+              "[concat('Microsoft.Compute/virtualMachines/', concat(variables('ServerName'),copyIndex(1)))]"
+            ],
+            "properties": {
+              "publisher": "Microsoft.Azure.Extensions",
+              "type": "CustomScript",
+              "typeHandlerVersion": "2.0",
+              "autoUpgradeMinorVersion": true,
+              "settings": {
+                "fileUris": [
+                  "https://raw.githubusercontent.com/Welasco/AppServiceLinuxBootcamp/master/./script.sh"
+                ],
+                "commandToExecute": "[concat('sh script.sh ',variables('adminUsername'))]"
+              }
+            }
+          }        
         {
             "apiVersion": "2016-05-15",
             "type": "Microsoft.DevTestLab/schedules",
