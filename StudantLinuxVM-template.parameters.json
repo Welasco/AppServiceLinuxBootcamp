@@ -5,8 +5,8 @@
         "adminUsername": {
             "value": "LabUserAdmin"
         },
-        "adminPublicKey": {
-            "value": ""
+        "adminPassword": {
+            "value": "NoP@ssw0rd!"
         },
         "authenticationType": {
             "value": "password"
