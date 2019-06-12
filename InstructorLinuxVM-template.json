@@ -1,0 +1,592 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "SrvAmount": {
+            "type": "int",
+            "metadata": {
+                "description": "The amount of Nodes to be created."
+            }
+        },
+        "adminUsername": {
+            "type": "string"
+        },
+        "adminPublicKey": {
+            "type": "securestring"
+        }      
+    },
+    "variables": {
+        "_location": "[resourceGroup().location]",
+        "rsgUniqueStr": "[concat(substring(uniqueString(resourceGroup().id), 0, 4),'-')]",
+        "mainName": "AppLab",
+        "adminUsername": "[parameters('adminUsername')]",
+        "adminPassword": "[parameters('adminPublicKey')]",
+        "addressPrefix": "10.11.0.0/16",
+        "subnetName": "DefaultSubnet",
+        "subnetPrefix": "10.11.0.0/24",
+        "virtualNetworkName": "[concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-VNET')]",
+        "subnetRef": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('virtualNetworkName'), variables('subnetName'))]",
+        "networkSecurityGroupName": "[concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-NSG')]",
+        
+        "lbName": "[concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-LoadBalancer')]",
+        "lbNameIP": "[concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-LoadBalancer-IP')]",
+        "lbIPFQDN": "[toLower(concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-LB'))]",
+        "lbID": "[resourceId('Microsoft.Network/loadBalancers',variables('lbName'))]",
+        "lbBackendPoolName": "BackendPool1",
+        "lbPoolID": "[concat(variables('lbID'),'/backendAddressPools/',variables('lbBackendPoolName'))]",
+        "lbProbeID": "[concat(variables('lbID'),'/probes/tcpProbe')]",
+        "frontEndIPConfigID": "[concat(variables('lbID'),'/frontendIPConfigurations/LoadBalancerFrontEnd')]",
+
+        "storageAccountName": "[toLower(concat(variables('mainName'),variables('rsgUniqueStr'),'stg'))]",
+        "storageContainerUri": "[concat('https://', variables('storageAccountName'), '.blob.core.windows.net/', 'vhds/')]",
+
+        "availabilitySetName": "[concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-availabilitySet')]",
+        "ServersAmount": "[parameters('SrvAmount')]",
+        "ServerName": "[concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-VM-')]",
+        "ServerPublicIPAddressName": "[concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-VM-PublicIP-')]",
+        "ServerNicName": "[concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-VM-NIC-')]",
+        "ServerDNSNameForPublicIP": "[toLower(variables('ServerName'))]"
+    },
+    "resources": [
+        {
+            "apiVersion": "2018-10-01",
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "name": "[variables('networkSecurityGroupName')]",
+            "location": "[variables('_location')]",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "HTTP",
+                        "properties": {
+                            "description": "Http",
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "80",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 100,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "HTTPS",
+                        "properties": {
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "443",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 120,
+                            "direction": "Inbound"
+                        }
+                    },
+                        {
+                        "name": "SSH",
+                        "properties": {
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "22",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 140,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "Port_3000-3200",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "3000-3200",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 150,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "Port_8080",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "8080",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 160,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "Port_2222",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "2222",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 170,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "Port_5000",
+                        "properties": {
+                            "protocol": "*",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "5000",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 180,
+                            "direction": "Inbound"
+                        }
+                    }                                    
+                ]
+            }
+        },        
+        {
+            "apiVersion": "2018-10-01",
+            "type": "Microsoft.Network/virtualNetworks",
+            "name": "[variables('virtualNetworkName')]",
+            "location": "[variables('_location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/networkSecurityGroups/', variables('networkSecurityGroupName'))]"
+            ],        
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[variables('addressPrefix')]"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "[variables('subnetName')]",
+                        "properties": {
+                            "addressPrefix": "[variables('subnetPrefix')]",
+                            "networkSecurityGroup": {
+                                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupName'))]"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "apiVersion": "2017-06-01",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "name": "[variables('lbNameIP')]",
+            "location": "[variables('_location')]",
+            "properties": {
+                "publicIPAllocationMethod": "Dynamic",
+                "dnsSettings": {
+                    "domainNameLabel": "[variables('lbIPFQDN')]"
+                }
+            }
+        },
+        {
+            "apiVersion": "2018-10-01",
+            "name": "[variables('lbName')]",
+            "type": "Microsoft.Network/loadBalancers",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/publicIPAddresses/', variables('lbNameIP'))]"
+            ],
+            "properties": {
+                "frontendIPConfigurations": [
+                    {
+                        "name": "LoadBalancerFrontEnd",
+                        "properties": {
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('lbNameIP'))]"
+                            }
+                        }
+                    }
+                ],
+                "backendAddressPools": [
+                    {
+                        "name": "[variables('lbBackendPoolName')]"
+                    }
+                ],
+                "inboundNatRules": [
+                    
+                ],
+                "loadBalancingRules": [
+                    {
+                        "name": "LBRule80",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[variables('frontEndIPConfigID')]"
+                            },
+                            "backendAddressPool": {
+                                "id": "[variables('lbPoolID')]"
+                            },
+                            "protocol": "Tcp",
+                            "frontendPort": 80,
+                            "backendPort": 80,
+                            "enableFloatingIP": false,
+                            "idleTimeoutInMinutes": 5,
+                            "probe": {
+                                "id": "[variables('lbProbeID')]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "LBRule443",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[variables('frontEndIPConfigID')]"
+                            },
+                            "backendAddressPool": {
+                                "id": "[variables('lbPoolID')]"
+                            },
+                            "protocol": "Tcp",
+                            "frontendPort": 443,
+                            "backendPort": 443,
+                            "enableFloatingIP": false,
+                            "idleTimeoutInMinutes": 5,
+                            "probe": {
+                                "id": "[variables('lbProbeID')]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "LBRule8080",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[variables('frontEndIPConfigID')]"
+                            },
+                            "backendAddressPool": {
+                                "id": "[variables('lbPoolID')]"
+                            },
+                            "protocol": "Tcp",
+                            "frontendPort": 8080,
+                            "backendPort": 8080,
+                            "enableFloatingIP": false,
+                            "idleTimeoutInMinutes": 5,
+                            "probe": {
+                                "id": "[variables('lbProbeID')]"
+                            }
+                        }
+                    },                                                            
+                    {
+                        "name": "LBRule3000",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[variables('frontEndIPConfigID')]"
+                            },
+                            "backendAddressPool": {
+                                "id": "[variables('lbPoolID')]"
+                            },
+                            "protocol": "tcp",
+                            "frontendPort": 3000,
+                            "backendPort": 3000,
+                            "enableFloatingIP": false,
+                            "idleTimeoutInMinutes": 5,
+                            "probe": {
+                                "id": "[variables('lbProbeID')]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "LBRule3001",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[variables('frontEndIPConfigID')]"
+                            },
+                            "backendAddressPool": {
+                                "id": "[variables('lbPoolID')]"
+                            },
+                            "protocol": "Tcp",
+                            "frontendPort": 3001,
+                            "backendPort": 3001,
+                            "enableFloatingIP": false,
+                            "idleTimeoutInMinutes": 5,
+                            "probe": {
+                                "id": "[variables('lbProbeID')]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "LBRule3002",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[variables('frontEndIPConfigID')]"
+                            },
+                            "backendAddressPool": {
+                                "id": "[variables('lbPoolID')]"
+                            },
+                            "protocol": "Tcp",
+                            "frontendPort": 3002,
+                            "backendPort": 3002,
+                            "enableFloatingIP": false,
+                            "idleTimeoutInMinutes": 5,
+                            "probe": {
+                                "id": "[variables('lbProbeID')]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "LBRule3003",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[variables('frontEndIPConfigID')]"
+                            },
+                            "backendAddressPool": {
+                                "id": "[variables('lbPoolID')]"
+                            },
+                            "protocol": "Tcp",
+                            "frontendPort": 3003,
+                            "backendPort": 3003,
+                            "enableFloatingIP": false,
+                            "idleTimeoutInMinutes": 5,
+                            "probe": {
+                                "id": "[variables('lbProbeID')]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "LBRule3004",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[variables('frontEndIPConfigID')]"
+                            },
+                            "backendAddressPool": {
+                                "id": "[variables('lbPoolID')]"
+                            },
+                            "protocol": "Tcp",
+                            "frontendPort": 3004,
+                            "backendPort": 3004,
+                            "enableFloatingIP": false,
+                            "idleTimeoutInMinutes": 5,
+                            "probe": {
+                                "id": "[variables('lbProbeID')]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "LBRule3004",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[variables('frontEndIPConfigID')]"
+                            },
+                            "backendAddressPool": {
+                                "id": "[variables('lbPoolID')]"
+                            },
+                            "protocol": "Tcp",
+                            "frontendPort": 3004,
+                            "backendPort": 3004,
+                            "enableFloatingIP": false,
+                            "idleTimeoutInMinutes": 5,
+                            "probe": {
+                                "id": "[variables('lbProbeID')]"
+                            }
+                        }
+                    },
+                    {
+                        "name": "LBRule5000",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[variables('frontEndIPConfigID')]"
+                            },
+                            "backendAddressPool": {
+                                "id": "[variables('lbPoolID')]"
+                            },
+                            "protocol": "Tcp",
+                            "frontendPort": 5000,
+                            "backendPort": 5000,
+                            "enableFloatingIP": false,
+                            "idleTimeoutInMinutes": 5,
+                            "probe": {
+                                "id": "[variables('lbProbeID')]"
+                            }
+                        }
+                    }
+                ],
+                "probes": [
+                    {
+                        "name": "tcpProbe",
+                        "properties": {
+                            "protocol": "Tcp",
+                            "port": 22,
+                            "intervalInSeconds": 5,
+                            "numberOfProbes": 2
+                        }
+                    }
+                ]
+            }
+        },
+
+        {
+            "apiVersion": "2018-07-01",
+            "name": "[variables('storageAccountName')]",
+            "type": "Microsoft.Storage/storageAccounts",
+            "location": "[variables('_location')]",
+            "properties": {},
+            "kind": "Storage",
+            "sku": {
+                "name": "Standard_LRS"
+            },
+            "tags": {}
+        },
+        
+        {
+            "apiVersion": "2017-06-01",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "name": "[concat(variables('ServerpublicIPAddressName'),copyIndex(1))]",
+            "location": "[variables('_location')]",
+            "copy": {
+                "name": "publicIPLoop",
+                "count": "[variables('ServersAmount')]"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "Dynamic",
+                "dnsSettings": {
+                    "domainNameLabel": "[concat(variables('ServerdnsNameForPublicIP'),copyIndex(1))]"
+                }
+            }
+        },
+        {
+            "apiVersion": "2018-04-01",
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[concat(variables('ServernicName'),copyIndex(1))]",
+            "location": "[variables('_location')]",
+            "copy": {
+                "name": "nicLoop",
+                "count": "[variables('ServersAmount')]"
+            },
+            "dependsOn": [
+                "[concat('Microsoft.Network/publicIPAddresses/', variables('ServerpublicIPAddressName'),copyIndex(1))]",
+                "[concat('Microsoft.Network/virtualNetworks/', variables('virtualNetworkName'))]",
+                "[concat('Microsoft.Network/loadBalancers/', variables('lbName'))]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', concat(variables('ServerpublicIPAddressName'), copyIndex(1)))]"
+                            },
+                            "subnet": {
+                                "id": "[variables('subnetRef')]"
+                            },
+                            "loadBalancerBackendAddressPools": [
+                                {
+                                    "id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('lbName')),'/backendAddressPools/', variables('lbBackendPoolName'))]"
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Compute/availabilitySets",
+            "name": "[variables('availabilitySetName')]",
+            "apiVersion": "2018-06-01",
+            "location": "[variables('_location')]",
+            "properties": {
+                "PlatformUpdateDomainCount": 3,
+                "PlatformFaultDomainCount": 2
+            },
+            "sku": {
+                "name": "Classic"
+            }
+        },                       
+        {
+            "apiVersion": "2018-04-01",
+            "type": "Microsoft.Compute/virtualMachines",
+            "name": "[concat(variables('ServerName'),copyIndex(1))]",
+            "location": "[variables('_location')]",
+            "copy": {
+                "name": "vmLoop",
+                "count": "[variables('ServersAmount')]"
+            },
+            "dependsOn": [
+                "[concat('Microsoft.Storage/storageAccounts/', variables('storageAccountName'))]",
+                "[concat('Microsoft.Compute/availabilitySets/', variables('availabilitySetName'))]",
+                "[concat('Microsoft.Network/networkInterfaces/', variables('ServernicName'), copyIndex(1))]"
+            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "Standard_B2s"
+                },
+                "osProfile": {
+                    "computerName": "[concat(variables('ServerName'),copyIndex(1))]",
+                    "adminUsername": "[variables('adminUsername')]",
+                    "linuxConfiguration": {
+                        "disablePasswordAuthentication": true,
+                        "ssh": {
+                            "publicKeys": [
+                                {
+                                    "path": "[concat('/home/', variables('adminUsername'), '/.ssh/authorized_keys')]",
+                                    "keyData": "[variables('adminPassword')]"
+                                }
+                            ]
+                        }
+                    }            
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "Canonical",
+                        "offer": "UbuntuServer",
+                        "sku": "18.04-LTS",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "createOption": "FromImage",
+                        "vhd":{
+                            "uri": "[concat(variables('storageContainerUri'), variables('ServerName'), copyIndex(1), '.vhd')]"
+                        },
+                        "name": "[concat(variables('ServerName'), copyIndex(1))]"
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', concat(variables('ServernicName'),copyIndex(1)))]"
+                        }
+                    ]
+                },
+                "availabilitySet": {
+                    "id": "[resourceId('Microsoft.Compute/availabilitySets',variables('availabilitySetName')) ]"
+                }
+            }
+        },
+        {
+            "apiVersion": "2016-05-15",
+            "type": "Microsoft.DevTestLab/schedules",
+            "name": "[concat('shutdown-computevm-',variables('ServerName'),copyIndex(1))]",
+            "location": "[variables('_location')]",
+            "copy": {
+                "name": "schedulesLoop",
+                "count": "[variables('ServersAmount')]"
+            },
+            "dependsOn": [
+                "[concat('Microsoft.Compute/virtualMachines/',variables('ServerName'),copyIndex(1))]"
+            ],
+            "properties":{
+                "status": "Enabled",
+                "taskType": "ComputeVmShutdownTask",
+                "dailyRecurrence": {
+                    "time": "1900"
+                },
+                "timeZoneId": "Central Standard Time",
+                "notificationSettings": {
+                    "status": "Disabled",
+                    "timeInMinutes": 30
+                },
+                "targetResourceId": "[resourceId('Microsoft.Compute/virtualMachines/',concat(variables('ServerName'),copyIndex(1)))]"
+            }
+        }
+    ],
+    "outputs": {
+    }
+  }
