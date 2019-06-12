@@ -36,13 +36,13 @@
         "addressPrefix": "10.11.0.0/16",
         "subnetName": "DefaultSubnet",
         "subnetPrefix": "10.11.0.0/24",
-        "virtualNetworkName": "[concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-VNET')]",
+        "virtualNetworkName": "[concat(variables('rsgUniqueStr'),variables('mainName'),'-VNET')]",
         "subnetRef": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('virtualNetworkName'), variables('subnetName'))]",
-        "networkSecurityGroupName": "[concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-NSG')]",
+        "networkSecurityGroupName": "[concat(variables('rsgUniqueStr'),variables('mainName'),'-NSG')]",
         
-        "lbName": "[concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-LoadBalancer')]",
-        "lbNameIP": "[concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-LoadBalancer-IP')]",
-        "lbIPFQDN": "[toLower(concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-LB'))]",
+        "lbName": "[concat(variables('rsgUniqueStr'),variables('mainName'),'-LoadBalancer')]",
+        "lbNameIP": "[concat(variables('rsgUniqueStr'),variables('mainName'),'-LoadBalancer-IP')]",
+        "lbIPFQDN": "[toLower(concat(variables('rsgUniqueStr'),variables('mainName'),'-LB'))]",
         "lbID": "[resourceId('Microsoft.Network/loadBalancers',variables('lbName'))]",
         "lbBackendPoolName": "BackendPool1",
         "lbPoolID": "[concat(variables('lbID'),'/backendAddressPools/',variables('lbBackendPoolName'))]",
@@ -52,11 +52,11 @@
         "storageAccountName": "[toLower(concat(substring(uniqueString(resourceGroup().id), 0, 4),variables('mainName'),'stg'))]",
         "storageContainerUri": "[concat('https://', variables('storageAccountName'), '.blob.core.windows.net/', 'vhds/')]",
 
-        "availabilitySetName": "[concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-availabilitySet')]",
+        "availabilitySetName": "[concat(variables('rsgUniqueStr'),variables('mainName'),'-availabilitySet')]",
         "ServersAmount": "[parameters('SrvAmount')]",
-        "ServerName": "[concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-VM-')]",
-        "ServerPublicIPAddressName": "[concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-VM-PublicIP-')]",
-        "ServerNicName": "[concat(variables('rsgUniqueStr'),'-',variables('mainName'),'-VM-NIC-')]",
+        "ServerName": "[concat(variables('rsgUniqueStr'),variables('mainName'),'-VM-')]",
+        "ServerPublicIPAddressName": "[concat(variables('rsgUniqueStr'),variables('mainName'),'-VM-PublicIP-')]",
+        "ServerNicName": "[concat(variables('rsgUniqueStr'),variables('mainName'),'-VM-NIC-')]",
         "ServerDNSNameForPublicIP": "[toLower(variables('ServerName'))]",
         "linuxConfiguration": {
             "disablePasswordAuthentication": true,
@@ -393,7 +393,7 @@
                         }
                     },
                     {
-                        "name": "LBRule3004",
+                        "name": "LBRule3005",
                         "properties": {
                             "frontendIPConfiguration": {
                                 "id": "[variables('frontEndIPConfigID')]"
@@ -402,8 +402,8 @@
                                 "id": "[variables('lbPoolID')]"
                             },
                             "protocol": "Tcp",
-                            "frontendPort": 3004,
-                            "backendPort": 3004,
+                            "frontendPort": 3005,
+                            "backendPort": 3005,
                             "enableFloatingIP": false,
                             "idleTimeoutInMinutes": 5,
                             "probe": {
