@@ -22,8 +22,8 @@ printf '%s\n' 'Docker compose available at: /home/userXXX/docker-compose.yml' \
     'docker stack deploy -c docker-compose.yml nodeapp' \
     '' \
     'Additional Commands:' \
-    'docker stack ps nodeport' \
-    'docker stack services nodeport' \
+    'docker stack ps nodeapp' \
+    'docker stack services nodeapp' \
     'docker node ps $(docker node ls -q) --filter desired-state=Running | uniq' \
     '' \
     '' > /home/$1/instructions.txt
