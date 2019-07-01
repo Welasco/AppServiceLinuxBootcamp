@@ -206,7 +206,7 @@
             "properties": {
                 "publicIPAllocationMethod": "Dynamic",
                 "dnsSettings": {
-                    "domainNameLabel": "[replace(variables('ServerdnsNameForPublicIP'),'-', '')]"
+                    "domainNameLabel": "[concat('lab',replace(variables('ServerdnsNameForPublicIP'),'-', ''))]"
                 }
             }
         },
