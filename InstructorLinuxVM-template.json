@@ -208,7 +208,7 @@
             "properties": {
                 "publicIPAllocationMethod": "Dynamic",
                 "dnsSettings": {
-                    "domainNameLabel": "[variables('lbIPFQDN')]"
+                    "domainNameLabel": "[replace(variables('lbIPFQDN'),'-', '')]"
                 }
             }
         },
@@ -470,7 +470,7 @@
             "properties": {
                 "publicIPAllocationMethod": "Dynamic",
                 "dnsSettings": {
-                    "domainNameLabel": "[concat(variables('ServerdnsNameForPublicIP'),copyIndex(1))]"
+                    "domainNameLabel": "[replace(concat(variables('ServerdnsNameForPublicIP'),copyIndex(1)),'-', '')]"
                 }
             }
         },
